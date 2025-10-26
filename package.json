@@ -10,19 +10,25 @@
     "start": "node dist/index.js",
     "prepare": "npm run build"
   },
-  "keywords": ["mcp", "envio", "hyperindex", "hypersync", "blockchain"],
+  "keywords": [
+    "mcp",
+    "envio",
+    "hyperindex",
+    "hypersync",
+    "blockchain"
+  ],
   "license": "MIT",
   "dependencies": {
+    "@envio-dev/hypersync-client": "^0.6.6",
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "@envio-dev/hypersync-client": "^0.13.0",
-    "yaml": "^2.3.4",
     "node-fetch": "^3.3.2",
+    "yaml": "^2.3.4",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "typescript": "^5.3.0",
-    "tsx": "^4.7.0"
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
   },
   "bin": {
     "hypermcp": "./dist/index.js"

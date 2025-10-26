@@ -1,4 +1,9 @@
-import HypersyncClient, { LogField, TransactionField, BlockField } from "@envio-dev/hypersync-client";
+import { 
+  HypersyncClient,
+  LogField, 
+  TransactionField, 
+  BlockField
+} from "@envio-dev/hypersync-client";
 
 export class HyperSyncTools {
   getToolDefinitions() {
@@ -37,7 +42,7 @@ export class HyperSyncTools {
       },
       {
         name: "hypersync_build_query",
-        description: "Build a HyperSync query with field selection",
+        description: "Build a HyperSync query structure",
         inputSchema: {
           type: "object",
           properties: {
@@ -87,9 +92,8 @@ export class HyperSyncTools {
       bearerToken: api_token,
     });
     
-    const query = {
+    const query: any = {
       fromBlock: from_block || 0,
-      toBlock: to_block,
       logs: [
         {
           address: addresses,
@@ -106,25 +110,38 @@ export class HyperSyncTools {
           LogField.Data,
           LogField.BlockNumber,
           LogField.TransactionIndex,
+          LogField.LogIndex,
         ],
       },
     };
     
+    if (to_block) {
+      query.toBlock = to_block;
+    }
+    
     try {
-      const res = await client.sendReq(query);
-      const logs = res.data?.logs || [];
+      // Use stream() method as per documentation
+      const stream = await client.stream(query, {});
+      const res = await stream.recv();
+      
+      const logs = res?.data?.logs || [];
       
       return {
         content: [
           {
             type: "text",
-            text: `✅ Query successful!\n\nLogs found: ${logs.length}\nNext block: ${res.nextBlock}\n\nFirst few logs:\n${JSON.stringify(logs.slice(0, 3), null, 2)}`,
+            text: `✅ Query successful!\n\n**Results:**\n- Logs found: ${logs.length}\n- Next block: ${res?.nextBlock}\n\n**Sample logs:**\n\`\`\`json\n${JSON.stringify(logs.slice(0, 3), null, 2)}\n\`\`\`\n\n**Note:** Use stream.recv() in a loop for continuous processing.`,
           },
         ],
       };
     } catch (error: any) {
       return {
-        content: [{ type: "text", text: `❌ Query failed: ${error.message}` }],
+        content: [
+          { 
+            type: "text", 
+            text: `❌ Query failed: ${error.message}\n\n**Troubleshooting:**\n- Verify endpoint: ${endpoint}\n- Check API token\n- Validate address format (0x...)\n- Ensure block range is reasonable`
+          }
+        ],
         isError: true,
       };
     }
@@ -150,9 +167,8 @@ export class HyperSyncTools {
       transactions.push({ to: [to_address] });
     }
     
-    const query = {
+    const query: any = {
       fromBlock: from_block || 0,
-      toBlock: to_block,
       transactions,
       fieldSelection: {
         transaction: [
@@ -165,15 +181,20 @@ export class HyperSyncTools {
       },
     };
     
+    if (to_block) {
+      query.toBlock = to_block;
+    }
+    
     try {
-      const res = await client.sendReq(query);
-      const txs = res.data?.transactions || [];
+      const stream = await client.stream(query, {});
+      const res = await stream.recv();
+      const txs = res?.data?.transactions || [];
       
       return {
         content: [
           {
             type: "text",
-            text: `✅ Found ${txs.length} transactions\n\n${JSON.stringify(txs.slice(0, 3), null, 2)}`,
+            text: `✅ Found ${txs.length} transactions\n\n**Next block:** ${res?.nextBlock}\n\n**Sample transactions:**\n\`\`\`json\n${JSON.stringify(txs.slice(0, 3), null, 2)}\n\`\`\``,
           },
         ],
       };
@@ -212,6 +233,7 @@ export class HyperSyncTools {
           ],
         };
         break;
+        
       case "transactions":
         query.transactions = [];
         if (filters?.from) query.transactions.push({ from: [filters.from] });
@@ -224,13 +246,22 @@ export class HyperSyncTools {
           ],
         };
         break;
+        
+      case "blocks":
+        query.fieldSelection = {
+          block: field_selection?.block || [
+            BlockField.Number,
+            BlockField.Timestamp,
+          ],
+        };
+        break;
     }
     
     return {
       content: [
         {
           type: "text",
-          text: `✅ Query built:\n\n\`\`\`json\n${JSON.stringify(query, null, 2)}\n\`\`\``,
+          text: `✅ Query built:\n\n\`\`\`json\n${JSON.stringify(query, null, 2)}\n\`\`\`\n\n**Join Modes (optional):**\n- **Default:** Returns logs → transactions → blocks\n- **JoinAll:** Returns comprehensive related data\n- **JoinNothing:** Only exact matches\n\n**Usage:**\n\`\`\`typescript\nimport { HypersyncClient } from "@envio-dev/hypersync-client";\n\nconst client = HypersyncClient.new({ url: "http://eth.hypersync.xyz" });\nconst stream = await client.stream(query, {});\nconst res = await stream.recv();\n\`\`\``,
         },
       ],
     };
@@ -239,35 +270,36 @@ export class HyperSyncTools {
   private async getNetworkEndpoint(args: any) {
     const { network_name, chain_id } = args;
     
-    const networks: any = {
-      ethereum: "https://eth.hypersync.xyz",
-      arbitrum: "https://arbitrum.hypersync.xyz",
-      base: "https://base.hypersync.xyz",
-      polygon: "https://polygon.hypersync.xyz",
-      optimism: "https://optimism.hypersync.xyz",
-      bsc: "https://bsc.hypersync.xyz",
+    const networks: Record<string, string> = {
+      ethereum: "http://eth.hypersync.xyz",
+      arbitrum: "http://arbitrum.hypersync.xyz",
+      base: "http://base.hypersync.xyz",
+      polygon: "http://polygon.hypersync.xyz",
+      optimism: "http://optimism.hypersync.xyz",
+      bsc: "http://bsc.hypersync.xyz",
     };
     
-    const endpoint = networks[network_name?.toLowerCase()] || `https://${chain_id}.hypersync.xyz`;
+    const endpoint = networks[network_name?.toLowerCase()] || 
+                    (chain_id ? `http://${chain_id}.hypersync.xyz` : "http://eth.hypersync.xyz");
     
     return {
       content: [
         {
           type: "text",
-          text: `✅ HyperSync endpoint:\n\n${endpoint}\n\nUsage:\n\`\`\`typescript\nconst client = HypersyncClient.new({\n  url: "${endpoint}",\n  bearerToken: "your-api-token"\n});\n\`\`\``,
+          text: `✅ HyperSync endpoint: **${endpoint}**\n\n**Usage:**\n\`\`\`typescript\nimport { HypersyncClient } from "@envio-dev/hypersync-client";\n\nconst client = HypersyncClient.new({\n  url: "${endpoint}",\n  bearerToken: process.env.HYPERSYNC_API_TOKEN\n});\n\`\`\`\n\n**Supported Networks:** 70+ EVM chains\n**Get API Token:** https://envio.dev/app/api-tokens`,
         },
       ],
     };
   }
 
   private getEndpoint(network: string): string {
-    const map: any = {
-      ethereum: "https://eth.hypersync.xyz",
-      arbitrum: "https://arbitrum.hypersync.xyz",
-      base: "https://base.hypersync.xyz",
-      polygon: "https://polygon.hypersync.xyz",
-      optimism: "https://optimism.hypersync.xyz",
+    const map: Record<string, string> = {
+      ethereum: "http://eth.hypersync.xyz",
+      arbitrum: "http://arbitrum.hypersync.xyz",
+      base: "http://base.hypersync.xyz",
+      polygon: "http://polygon.hypersync.xyz",
+      optimism: "http://optimism.hypersync.xyz",
     };
-    return map[network.toLowerCase()] || "https://eth.hypersync.xyz";
+    return map[network.toLowerCase()] || "http://eth.hypersync.xyz";
   }
 }

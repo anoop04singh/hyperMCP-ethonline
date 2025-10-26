@@ -6,60 +6,203 @@ import * as yaml from "yaml";
 const execAsync = promisify(exec);
 
 export class HyperIndexTools {
+  private async checkEnvioCLI(): Promise<{ installed: boolean; message: string }> {
+    try {
+      const { stdout } = await execAsync("envio --help");
+      return { installed: true, message: "Envio CLI is installed" };
+    } catch (error) {
+      return {
+        installed: false,
+        message: "Envio CLI not found. Install with: npm install -g envio",
+      };
+    }
+  }
+
   getToolDefinitions() {
     return [
+      // Initialization Commands
       {
         name: "hyperindex_init_project",
-        description: "Initialize a new HyperIndex project",
+        description: "Initialize a new HyperIndex project using envio init",
         inputSchema: {
           type: "object",
           properties: {
-            name: { type: "string" },
-            language: { type: "string", enum: ["typescript", "javascript", "rescript"] },
-            directory: { type: "string" },
+            name: { type: "string", description: "Project name" },
+            language: { 
+              type: "string", 
+              enum: ["typescript", "javascript", "rescript"],
+              description: "Handler language" 
+            },
+            directory: { type: "string", description: "Output directory" },
+            api_token: { type: "string", description: "HyperSync API token" },
           },
           required: ["name", "language"],
         },
       },
       {
-        name: "hyperindex_import_contract",
-        description: "Import contract from block explorer",
+        name: "hyperindex_init_contract_import_explorer",
+        description: "Import contract from block explorer (envio init contract-import explorer)",
         inputSchema: {
           type: "object",
           properties: {
-            address: { type: "string" },
-            blockchain: { type: "string" },
-            all_events: { type: "boolean" },
+            name: { type: "string", description: "Project name" },
+            contract_address: { type: "string", description: "Contract address" },
+            blockchain: { 
+              type: "string", 
+              description: "Network (e.g., ethereum-mainnet, base, arbitrum-one)" 
+            },
+            language: { type: "string", enum: ["typescript", "javascript", "rescript"] },
+            directory: { type: "string", description: "Output directory" },
+            single_contract: { type: "boolean", description: "Don't prompt for more contracts" },
+            all_events: { type: "boolean", description: "Index all events without prompting" },
+            api_token: { type: "string", description: "HyperSync API token" },
           },
-          required: ["address", "blockchain"],
+          required: ["name", "contract_address", "blockchain", "language"],
         },
       },
       {
+        name: "hyperindex_init_contract_import_local",
+        description: "Import contract from local ABI file (envio init contract-import local)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            abi_file: { type: "string", description: "Path to JSON ABI file" },
+            contract_name: { type: "string", description: "Contract name" },
+            contract_address: { type: "string", description: "Contract address" },
+            blockchain: { type: "string", description: "Network name or chain ID" },
+            start_block: { type: "number", description: "Starting block number" },
+            rpc_url: { type: "string", description: "RPC URL for unsupported networks" },
+            language: { type: "string", enum: ["typescript", "javascript", "rescript"] },
+            directory: { type: "string" },
+            api_token: { type: "string" },
+          },
+          required: ["name", "abi_file", "contract_name", "blockchain", "language"],
+        },
+      },
+      {
+        name: "hyperindex_init_template",
+        description: "Initialize from template (envio init template)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            template: { 
+              type: "string", 
+              enum: ["greeter", "erc20"],
+              description: "Template to use" 
+            },
+            language: { type: "string", enum: ["typescript", "javascript", "rescript"] },
+            directory: { type: "string" },
+            api_token: { type: "string" },
+          },
+          required: ["name", "template", "language"],
+        },
+      },
+      
+      // Development Commands
+      {
+        name: "hyperindex_dev",
+        description: "Run indexer in development mode with hot reloading (envio dev)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            directory: { type: "string", description: "Project directory" },
+          },
+        },
+      },
+      {
+        name: "hyperindex_codegen",
+        description: "Generate indexing code from config (envio codegen)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            directory: { type: "string" },
+          },
+        },
+      },
+      {
+        name: "hyperindex_start",
+        description: "Start indexer without codegen (envio start)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            directory: { type: "string" },
+            restart: { type: "boolean", description: "Clear database and restart" },
+            bench: { type: "boolean", description: "Save benchmark data" },
+          },
+        },
+      },
+      {
+        name: "hyperindex_stop",
+        description: "Stop local environment (envio stop)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            directory: { type: "string" },
+          },
+        },
+      },
+      
+      // Environment Management
+      {
+        name: "hyperindex_local_docker_up",
+        description: "Start Docker containers (envio local docker up)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            directory: { type: "string" },
+          },
+        },
+      },
+      {
+        name: "hyperindex_local_docker_down",
+        description: "Stop Docker containers (envio local docker down)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            directory: { type: "string" },
+          },
+        },
+      },
+      {
+        name: "hyperindex_local_db_migrate_setup",
+        description: "Setup database schema (envio local db-migrate setup)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            directory: { type: "string" },
+          },
+        },
+      },
+      
+      // Analysis
+      {
+        name: "hyperindex_benchmark_summary",
+        description: "View benchmark performance data (envio benchmark-summary)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            directory: { type: "string" },
+          },
+        },
+      },
+      
+      // Helper Functions
+      {
         name: "hyperindex_validate_config",
-        description: "Validate config.yaml for errors",
+        description: "Validate config.yaml structure",
         inputSchema: {
           type: "object",
           properties: {
             config_path: { type: "string" },
+            config_content: { type: "string" },
           },
-          required: ["config_path"],
-        },
-      },
-      {
-        name: "hyperindex_generate_schema",
-        description: "Generate GraphQL schema from entity definitions",
-        inputSchema: {
-          type: "object",
-          properties: {
-            entities: { type: "array" },
-            output_path: { type: "string" },
-          },
-          required: ["entities"],
         },
       },
       {
         name: "hyperindex_generate_handler",
-        description: "Generate event handler template",
+        description: "Generate event handler template code",
         inputSchema: {
           type: "object",
           properties: {
@@ -72,39 +215,11 @@ export class HyperIndexTools {
         },
       },
       {
-        name: "hyperindex_setup_dynamic_contracts",
-        description: "Setup dynamic contract registration for factory patterns",
+        name: "hyperindex_check_installation",
+        description: "Check Envio CLI installation status",
         inputSchema: {
           type: "object",
-          properties: {
-            factory_address: { type: "string" },
-            event_name: { type: "string" },
-            contract_template: { type: "string" },
-          },
-          required: ["factory_address", "event_name"],
-        },
-      },
-      {
-        name: "hyperindex_configure_multichain",
-        description: "Configure multi-chain indexing",
-        inputSchema: {
-          type: "object",
-          properties: {
-            networks: { type: "array" },
-            unordered_mode: { type: "boolean" },
-          },
-          required: ["networks"],
-        },
-      },
-      {
-        name: "hyperindex_run_codegen",
-        description: "Run envio codegen",
-        inputSchema: {
-          type: "object",
-          properties: {
-            project_path: { type: "string" },
-          },
-          required: ["project_path"],
+          properties: {},
         },
       },
     ];
@@ -114,296 +229,188 @@ export class HyperIndexTools {
     switch (name) {
       case "hyperindex_init_project":
         return await this.initProject(args);
-      case "hyperindex_import_contract":
-        return await this.importContract(args);
+      case "hyperindex_init_contract_import_explorer":
+        return await this.initContractImportExplorer(args);
+      case "hyperindex_init_contract_import_local":
+        return await this.initContractImportLocal(args);
+      case "hyperindex_init_template":
+        return await this.initTemplate(args);
+      case "hyperindex_dev":
+        return await this.dev(args);
+      case "hyperindex_codegen":
+        return await this.codegen(args);
+      case "hyperindex_start":
+        return await this.start(args);
+      case "hyperindex_stop":
+        return await this.stop(args);
+      case "hyperindex_local_docker_up":
+        return await this.localDockerUp(args);
+      case "hyperindex_local_docker_down":
+        return await this.localDockerDown(args);
+      case "hyperindex_local_db_migrate_setup":
+        return await this.localDbMigrateSetup(args);
+      case "hyperindex_benchmark_summary":
+        return await this.benchmarkSummary(args);
       case "hyperindex_validate_config":
         return await this.validateConfig(args);
-      case "hyperindex_generate_schema":
-        return await this.generateSchema(args);
       case "hyperindex_generate_handler":
         return await this.generateHandler(args);
-      case "hyperindex_setup_dynamic_contracts":
-        return await this.setupDynamicContracts(args);
-      case "hyperindex_configure_multichain":
-        return await this.configureMultichain(args);
-      case "hyperindex_run_codegen":
-        return await this.runCodegen(args);
+      case "hyperindex_check_installation":
+        return await this.checkInstallation();
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
   }
 
+  private async checkInstallation() {
+    const check = await this.checkEnvioCLI();
+    return {
+      content: [
+        {
+          type: "text",
+          text: check.installed 
+            ? `✅ Envio CLI is installed and ready!\n\nRun \`envio --help\` to see available commands.`
+            : `❌ ${check.message}\n\n**Install now:**\n\`\`\`bash\nnpm install -g envio\n\`\`\``,
+        },
+      ],
+    };
+  }
+
   private async initProject(args: any) {
-    const { name, language, directory } = args;
-    const dir = directory || `./${name}`;
+    const { name, language, directory, api_token } = args;
     
-    const cmd = `npx envio init --name ${name} --language ${language} --directory ${dir}`;
+    let cmd = `envio init -n ${name} -l ${language}`;
+    if (directory) cmd += ` -d ${directory}`;
+    if (api_token) cmd += ` --api-token ${api_token}`;
     
     try {
-      const { stdout, stderr } = await execAsync(cmd);
+      const { stdout } = await execAsync(cmd, { timeout: 120000 });
       return {
         content: [
           {
             type: "text",
-            text: `✅ Project initialized successfully!\n\nOutput:\n${stdout}\n\nNext steps:\n1. cd ${dir}\n2. Configure contracts in config.yaml\n3. Run: pnpm dev`,
+            text: `✅ Project initialized!\n\n**Name:** ${name}\n**Language:** ${language}\n**Directory:** ${directory || name}\n\n**Next steps:**\n\`\`\`bash\ncd ${directory || name}\npnpm install\npnpm dev\n\`\`\`\n\n${stdout}`,
           },
         ],
       };
     } catch (error: any) {
       return {
-        content: [{ type: "text", text: `❌ Error: ${error.message}` }],
+        content: [{ type: "text", text: `❌ Init failed: ${error.message}` }],
         isError: true,
       };
     }
   }
 
-  private async importContract(args: any) {
-    const { address, blockchain, all_events } = args;
+  private async initContractImportExplorer(args: any) {
+    const { 
+      name, contract_address, blockchain, language, directory, 
+      single_contract, all_events, api_token 
+    } = args;
     
-    const eventsFlag = all_events ? "--all-events" : "";
-    const cmd = `npx envio init contract-import explorer -c ${address} -b ${blockchain} ${eventsFlag}`;
+    let cmd = `envio init contract-import explorer -n ${name} -c ${contract_address} -b ${blockchain} -l ${language}`;
+    if (directory) cmd += ` -d ${directory}`;
+    if (single_contract) cmd += ` --single-contract`;
+    if (all_events) cmd += ` --all-events`;
+    if (api_token) cmd += ` --api-token ${api_token}`;
     
     try {
-      const { stdout } = await execAsync(cmd);
+      const { stdout } = await execAsync(cmd, { timeout: 120000 });
       return {
         content: [
           {
             type: "text",
-            text: `✅ Contract imported: ${address}\n\nBlockchain: ${blockchain}\n\n${stdout}`,
+            text: `✅ Contract imported from block explorer!\n\n**Contract:** ${contract_address}\n**Network:** ${blockchain}\n**Project:** ${name}\n\n**Next steps:**\n\`\`\`bash\ncd ${directory || name}\npnpm install\npnpm dev\n\`\`\`\n\n${stdout}`,
           },
         ],
       };
     } catch (error: any) {
       return {
-        content: [{ type: "text", text: `❌ Import failed: ${error.message}` }],
+        content: [{ type: "text", text: `❌ Import failed: ${error.message}\n\nMake sure the contract is verified on the block explorer.` }],
         isError: true,
       };
     }
   }
 
-  private async validateConfig(args: any) {
-    const { config_path } = args;
+  private async initContractImportLocal(args: any) {
+    const { 
+      name, abi_file, contract_name, contract_address, blockchain, 
+      start_block, rpc_url, language, directory, api_token 
+    } = args;
+    
+    let cmd = `envio init contract-import local -n ${name} -a ${abi_file} --contract-name ${contract_name} -c ${contract_address} -b ${blockchain} -l ${language}`;
+    if (start_block !== undefined) cmd += ` -s ${start_block}`;
+    if (rpc_url) cmd += ` -r ${rpc_url}`;
+    if (directory) cmd += ` -d ${directory}`;
+    if (api_token) cmd += ` --api-token ${api_token}`;
     
     try {
-      const content = await fs.readFile(config_path, "utf-8");
-      const config = yaml.parse(content);
-      
-      // Validation checks
-      const errors = [];
-      
-      if (!config.name) errors.push("Missing 'name' field");
-      if (!config.networks || config.networks.length === 0) {
-        errors.push("No networks configured");
-      }
-      if (!config.contracts || config.contracts.length === 0) {
-        errors.push("No contracts configured");
-      }
-      
-      // Check network configs
-      if (config.networks) {
-        config.networks.forEach((net: any, idx: number) => {
-          if (!net.id) errors.push(`Network ${idx}: Missing 'id'`);
-          if (net.startblock === undefined) errors.push(`Network ${idx}: Missing 'startblock'`);
-          if (!net.contracts) errors.push(`Network ${idx}: No contracts defined`);
-        });
-      }
-      
-      if (errors.length > 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `❌ Config validation failed:\n\n${errors.join("\n")}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-      
+      const { stdout } = await execAsync(cmd, { timeout: 120000 });
       return {
         content: [
           {
             type: "text",
-            text: `✅ Config is valid!\n\nNetworks: ${config.networks.length}\nContracts: ${config.contracts?.length || 0}`,
+            text: `✅ Contract imported from local ABI!\n\n**Contract:** ${contract_name}\n**ABI:** ${abi_file}\n**Network:** ${blockchain}\n\n**Next steps:**\n\`\`\`bash\ncd ${directory || name}\npnpm install\npnpm dev\n\`\`\`\n\n${stdout}`,
           },
         ],
       };
     } catch (error: any) {
       return {
-        content: [{ type: "text", text: `❌ Error: ${error.message}` }],
+        content: [{ type: "text", text: `❌ Import failed: ${error.message}\n\nCheck that the ABI file exists and is valid JSON.` }],
         isError: true,
       };
     }
   }
 
-  private async generateSchema(args: any) {
-    const { entities, output_path } = args;
+  private async initTemplate(args: any) {
+    const { name, template, language, directory, api_token } = args;
     
-    let schema = "";
-    
-    entities.forEach((entity: any) => {
-      schema += `type ${entity.name} {\n`;
-      schema += `  id: ID!\n`;
-      
-      entity.fields?.forEach((field: any) => {
-        const required = field.required ? "!" : "";
-        schema += `  ${field.name}: ${field.type}${required}\n`;
-      });
-      
-      schema += `}\n\n`;
-    });
-    
-    const path = output_path || "./schema.graphql";
+    let cmd = `envio init template -n ${name} -t ${template} -l ${language}`;
+    if (directory) cmd += ` -d ${directory}`;
+    if (api_token) cmd += ` --api-token ${api_token}`;
     
     try {
-      await fs.writeFile(path, schema);
+      const { stdout } = await execAsync(cmd, { timeout: 120000 });
       return {
         content: [
           {
             type: "text",
-            text: `✅ Schema generated at ${path}\n\n${schema}`,
+            text: `✅ Template project created!\n\n**Template:** ${template}\n**Name:** ${name}\n\n**Next steps:**\n\`\`\`bash\ncd ${directory || name}\npnpm install\npnpm dev\n\`\`\`\n\n${stdout}`,
           },
         ],
       };
     } catch (error: any) {
       return {
-        content: [{ type: "text", text: `❌ Error: ${error.message}` }],
+        content: [{ type: "text", text: `❌ Template init failed: ${error.message}` }],
         isError: true,
       };
     }
   }
 
-  private async generateHandler(args: any) {
-    const { contract_name, event_name, entity, language } = args;
-    
-    const templates: any = {
-      typescript: `import { ${contract_name } from "../generated/src/Handlers.gen";
-
-${contract_name}.${event_name}.handler(async ({ event, context }) => {
-  // Load or create entity
-  let entity = await context.${entity}.get(event.params.id.toString());
-  
-  if (!entity) {
-    entity = {
-      id: event.params.id.toString(),
-      // Add fields here
-    };
-  }
-  
-  // Update entity with event data
-  // entity.field = event.params.value;
-  
-  // Save entity
-  await context.${entity}.set(entity);
-});`,
-      javascript: `import { ${contract_name } } from "../generated/src/Handlers.gen";
-
-${contract_name}.${event_name}.handler(async ({ event, context }) => {
-  let entity = await context.${entity}.get(event.params.id.toString());
-  
-  if (!entity) {
-    entity = {
-      id: event.params.id.toString(),
-    };
-  }
-  
-  await context.${entity}.set(entity);
-});`,
-    };
-    
-    const handler = templates[language] || templates.typescript;
+  private async dev(args: any) {
+    const { directory } = args;
+    const dir = directory ? `-d ${directory}` : "";
     
     return {
       content: [
         {
           type: "text",
-          text: `✅ Handler template for ${contract_name}.${event_name}:\n\n\`\`\`${language}\n${handler}\n\`\`\``,
+          text: `To start development mode, run:\n\n\`\`\`bash\n${directory ? `cd ${directory}\n` : ""}envio dev\n\`\`\`\n\nThis will:\n✅ Start the indexer with hot reloading\n✅ Auto-generate code on config changes\n✅ Start local GraphQL server\n\n**Stop with:** Ctrl+C`,
         },
       ],
     };
   }
 
-  private async setupDynamicContracts(args: any) {
-    const { factory_address, event_name, contract_template } = args;
-    
-    const template = `// Dynamic Contract Registration Handler
-// Add this to your event handler file
-
-${contract_template || "ContractTemplate"}.${event_name}.handler(async ({ event, context }) => {
-  // Extract new contract address from event
-  const newContractAddress = event.params.contractAddress;
-  
-  // Register the new contract dynamically
-  context.contractRegistration.add${contract_template || "Contract"}(newContractAddress);
-  
-  console.log(\`Registered new contract: \${newContractAddress}\`);
-});
-
-// Config.yaml setup:
-/*
-contracts:
-  - name: ${contract_template || "Factory"}
-    address: "${factory_address}"
-    handler: "./src/EventHandlers.ts"
-    events:
-      - event: "${event_name}(address contractAddress)"
-  
-  - name: ${contract_template || "ChildContract"}
-    handler: "./src/EventHandlers.ts"
-    # No address - will be registered dynamically
-    events:
-      - event: "Transfer(address indexed from, address indexed to, uint256 value)"
-*/`;
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: `✅ Dynamic contract registration setup:\n\n\`\`\`typescript\n${template}\n\`\`\``,
-        },
-      ],
-    };
-  }
-
-  private async configureMultichain(args: any) {
-    const { networks, unordered_mode } = args;
-    
-    const config = {
-      name: "multi-chain-indexer",
-      unorderedmultichainmode: unordered_mode || true,
-      networks: networks.map((net: any) => ({
-        id: net.id,
-        start_block: net.start_block || 0,
-        contracts: net.contracts || [],
-      })),
-    };
-    
-    const yamlContent = yaml.stringify(config);
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: `✅ Multi-chain configuration:\n\n\`\`\`yaml\n${yamlContent}\n\`\`\`\n\n${
-            unordered_mode
-              ? "✅ Unordered mode: Better performance, events processed as they arrive"
-              : "⚠️ Ordered mode: Strict ordering across chains, slower sync"
-          }`,
-        },
-      ],
-    };
-  }
-
-  private async runCodegen(args: any) {
-    const { project_path } = args;
+  private async codegen(args: any) {
+    const { directory } = args;
+    const cmd = directory ? `cd ${directory} && envio codegen` : "envio codegen";
     
     try {
-      const { stdout, stderr } = await execAsync(`cd ${project_path} && npx envio codegen`);
+      const { stdout } = await execAsync(cmd, { timeout: 60000 });
       return {
         content: [
           {
             type: "text",
-            text: `✅ Codegen completed!\n\n${stdout}\n\nGenerated files in: ${project_path}/generated/`,
+            text: `✅ Code generation complete!\n\n${stdout}\n\n**Generated files:**\n- Handler types\n- Entity types\n- GraphQL schema`,
           },
         ],
       };
@@ -413,5 +420,196 @@ contracts:
         isError: true,
       };
     }
+  }
+
+  private async start(args: any) {
+    const { directory, restart, bench } = args;
+    let cmd = "envio start";
+    if (restart) cmd += " -r";
+    if (bench) cmd += " -b";
+    if (directory) cmd = `cd ${directory} && ${cmd}`;
+    
+    return {
+      content: [
+        {
+          type: "text",
+          text: `To start the indexer, run:\n\n\`\`\`bash\n${cmd}\n\`\`\`\n\n**Options:**\n${restart ? "✅ Will clear database and restart\n" : ""}${bench ? "✅ Will save benchmark data\n" : ""}`,
+        },
+      ],
+    };
+  }
+
+  private async stop(args: any) {
+    const { directory } = args;
+    const cmd = directory ? `cd ${directory} && envio stop` : "envio stop";
+    
+    try {
+      const { stdout } = await execAsync(cmd, { timeout: 30000 });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✅ Environment stopped!\n\n${stdout}\n\nThis deleted the database and stopped all processes.`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: "text", text: `❌ Stop failed: ${error.message}` }],
+        isError: true,
+      };
+    }
+  }
+
+  private async localDockerUp(args: any) {
+    const { directory } = args;
+    const cmd = directory ? `cd ${directory} && envio local docker up` : "envio local docker up";
+    
+    try {
+      const { stdout } = await execAsync(cmd, { timeout: 60000 });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✅ Docker containers started!\n\n${stdout}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: "text", text: `❌ Docker up failed: ${error.message}\n\nMake sure Docker Desktop is running.` }],
+        isError: true,
+      };
+    }
+  }
+
+  private async localDockerDown(args: any) {
+    const { directory } = args;
+    const cmd = directory ? `cd ${directory} && envio local docker down` : "envio local docker down";
+    
+    try {
+      const { stdout } = await execAsync(cmd, { timeout: 30000 });
+      return {
+        content: [{ type: "text", text: `✅ Docker containers stopped!\n\n${stdout}` }],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: "text", text: `❌ Docker down failed: ${error.message}` }],
+        isError: true,
+      };
+    }
+  }
+
+  private async localDbMigrateSetup(args: any) {
+    const { directory } = args;
+    const cmd = directory ? `cd ${directory} && envio local db-migrate setup` : "envio local db-migrate setup";
+    
+    try {
+      const { stdout } = await execAsync(cmd, { timeout: 30000 });
+      return {
+        content: [{ type: "text", text: `✅ Database schema setup complete!\n\n${stdout}` }],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: "text", text: `❌ DB setup failed: ${error.message}` }],
+        isError: true,
+      };
+    }
+  }
+
+  private async benchmarkSummary(args: any) {
+    const { directory } = args;
+    const cmd = directory ? `cd ${directory} && envio benchmark-summary` : "envio benchmark-summary";
+    
+    try {
+      const { stdout } = await execAsync(cmd, { timeout: 10000 });
+      return {
+        content: [{ type: "text", text: `📊 Benchmark Summary:\n\n\`\`\`\n${stdout}\n\`\`\`` }],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: "text", text: `❌ No benchmark data found. Run \`envio start --bench\` first.` }],
+        isError: true,
+      };
+    }
+  }
+
+  private async validateConfig(args: any) {
+    const { config_path, config_content } = args;
+    
+    try {
+      let content: string;
+      
+      if (config_content) {
+        content = config_content;
+      } else if (config_path) {
+        content = await fs.readFile(config_path, "utf-8");
+      } else {
+        return {
+          content: [{ type: "text", text: "❌ Provide config_path or config_content" }],
+          isError: true,
+        };
+      }
+      
+      const config = yaml.parse(content);
+      const errors = [];
+      
+      if (!config.name) errors.push("Missing 'name' field");
+      if (!config.networks) errors.push("Missing 'networks' array");
+      if (!config.contracts) errors.push("Missing 'contracts' array");
+      
+      if (errors.length > 0) {
+        return {
+          content: [{ type: "text", text: `❌ Validation errors:\n${errors.map(e => `• ${e}`).join("\n")}` }],
+          isError: true,
+        };
+      }
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✅ Config is valid!\n\n**Name:** ${config.name}\n**Networks:** ${config.networks.length}\n**Contracts:** ${config.contracts.length}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: "text", text: `❌ ${error.message}` }],
+        isError: true,
+      };
+    }
+  }
+
+  private async generateHandler(args: any) {
+    const { contract_name, event_name, entity, language } = args;
+    
+    const handler = `import { ${contract_name} } from "../generated/src/Handlers.gen";
+
+${contract_name}.${event_name}.handler(async ({ event, context }) => {
+  const id = \`\${event.transaction.hash}-\${event.logIndex}\`;
+  
+  let entity = await context.${entity || event_name}.get(id);
+  
+  if (!entity) {
+    entity = {
+      id,
+      blockNumber: event.block.number,
+      blockTimestamp: event.block.timestamp,
+      transactionHash: event.transaction.hash,
+    };
+  }
+  
+  await context.${entity || event_name}.set(entity);
+});`;
+    
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ Handler template:\n\n\`\`\`${language}\n${handler}\n\`\`\``,
+        },
+      ],
+    };
   }
 }

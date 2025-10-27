@@ -1,6 +1,6 @@
 # **HyperMCP**
 
-**Built by [@0xanoop](https://x.com/0xanoop)** for the **Envio AI + Tooling Hackathon**
+**Built by [@0xanoop](https://x.com/0xanoop)** for the **Envio AI + Tooling Hackathon at ETHONLINE**
 
 ---
 

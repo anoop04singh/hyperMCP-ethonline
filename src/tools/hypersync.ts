@@ -10,26 +10,16 @@ export class HyperSyncTools {
     return [
       {
         name: "hypersync_query_logs",
-        description: "Query blockchain event logs with HyperSync across 70+ networks",
+        description: "Query blockchain event logs with HyperSync",
         inputSchema: {
           type: "object",
           properties: {
-            network: { type: "string", description: "Network name" },
-            from_block: { type: "number", description: "Starting block (default: 0)" },
-            to_block: { type: "number", description: "Ending block (optional)" },
-            addresses: { 
-              type: "array", 
-              items: { type: "string" },
-              description: "Contract addresses to filter"
-            },
-            topics: { 
-              type: "array",
-              description: "Topic filters - array of arrays [[topic0], [topic1], ...]"
-            },
-            max_num_logs: { 
-              type: "number",
-              description: "Maximum logs to return (default: 5000)"
-            },
+            network: { type: "string" },
+            from_block: { type: "number" },
+            to_block: { type: "number" },
+            addresses: { type: "array", items: { type: "string" } },
+            topics: { type: "array" },
+            max_num_logs: { type: "number" },
           },
           required: ["network"],
         },
@@ -52,7 +42,7 @@ export class HyperSyncTools {
       },
       {
         name: "hypersync_build_query",
-        description: "Build a HyperSync query structure with documentation",
+        description: "Build a HyperSync query structure",
         inputSchema: {
           type: "object",
           properties: {
@@ -73,7 +63,6 @@ export class HyperSyncTools {
           properties: {
             network_name: { type: "string" },
           },
-          required: ["network_name"],
         },
       },
     ];
@@ -94,6 +83,31 @@ export class HyperSyncTools {
     }
   }
 
+  // Helper to convert BigInt to string for JSON serialization
+  private serializeBigInt(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    
+    if (typeof obj === 'bigint') {
+      return obj.toString();
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.serializeBigInt(item));
+    }
+    
+    if (typeof obj === 'object') {
+      const serialized: any = {};
+      for (const key in obj) {
+        serialized[key] = this.serializeBigInt(obj[key]);
+      }
+      return serialized;
+    }
+    
+    return obj;
+  }
+
   private async queryLogs(args: any) {
     const { network, from_block, to_block, addresses, topics, max_num_logs } = args;
     
@@ -103,7 +117,6 @@ export class HyperSyncTools {
       url: endpoint,
     });
     
-    // Build query per documentation
     const query: any = {
       fromBlock: from_block || 0,
       fieldSelection: {
@@ -127,7 +140,6 @@ export class HyperSyncTools {
       },
     };
     
-    // Add optional parameters
     if (to_block) {
       query.toBlock = to_block;
     }
@@ -136,19 +148,19 @@ export class HyperSyncTools {
       query.maxNumLogs = max_num_logs;
     }
     
-    // Add log filters - topics should be array of arrays per docs
     if (addresses || topics) {
       query.logs = [{
         ...(addresses && { address: addresses }),
         ...(topics && { topics: Array.isArray(topics[0]) ? topics : [topics] }),
       }];
+    } else {
+      query.logs = [{}];
     }
     
     try {
       const stream = await client.stream(query, {});
       const res = await stream.recv();
       
-      // Check for null explicitly
       if (!res) {
         return {
           content: [{
@@ -159,8 +171,9 @@ export class HyperSyncTools {
         };
       }
       
-      const logs = res.data?.logs || [];
-      const blocks = res.data?.blocks || [];
+      // Serialize BigInt values
+      const logs = this.serializeBigInt(res.data?.logs || []);
+      const blocks = this.serializeBigInt(res.data?.blocks || []);
       
       let output = `✅ Query successful!\n\n`;
       output += `**Network:** ${network}\n`;
@@ -175,9 +188,11 @@ export class HyperSyncTools {
       
       if (logs.length > 0) {
         output += `\n**Sample logs (first 3):**\n\`\`\`json\n${JSON.stringify(logs.slice(0, 3), null, 2)}\n\`\`\`\n`;
+      } else {
+        output += `\n**Note:** No logs found in this range.`;
       }
       
-      output += `\n**Pagination:** To continue querying, use \`from_block: ${res.nextBlock}\``;
+      output += `\n\n**Pagination:** To continue, use \`from_block: ${res.nextBlock}\``;
       
       return {
         content: [{
@@ -190,7 +205,7 @@ export class HyperSyncTools {
       return {
         content: [{
           type: "text",
-          text: `❌ Query failed: ${error.message}\n\n**Troubleshooting:**\n- Endpoint: ${endpoint}\n- Check address format (0x...)\n- Reduce block range if timeout\n- Verify network is supported\n- Topics format: [[topic0], [topic1], ...]`,
+          text: `❌ Query failed: ${error.message}\n\n**Troubleshooting:**\n- Endpoint: ${endpoint}\n- Check address format (0x...)\n- Reduce block range\n- Try smaller max_num_logs`,
         }],
         isError: true,
       };
@@ -218,6 +233,7 @@ export class HyperSyncTools {
           TransactionField.GasPrice,
           TransactionField.BlockNumber,
           TransactionField.TransactionIndex,
+          TransactionField.Input,
         ],
         block: [
           BlockField.Number,
@@ -234,17 +250,17 @@ export class HyperSyncTools {
       query.maxNumTransactions = max_num_transactions;
     }
     
-    // Build transaction filters with OR relationship
-    const txFilters = [];
-    if (from_address) {
-      txFilters.push({ from: [from_address] });
-    }
-    if (to_address) {
-      txFilters.push({ to: [to_address] });
-    }
-    
-    if (txFilters.length > 0) {
+    if (from_address || to_address) {
+      const txFilters = [];
+      if (from_address) {
+        txFilters.push({ from: [from_address] });
+      }
+      if (to_address) {
+        txFilters.push({ to: [to_address] });
+      }
       query.transactions = txFilters;
+    } else {
+      query.transactions = [{}];
     }
     
     try {
@@ -255,18 +271,33 @@ export class HyperSyncTools {
         return {
           content: [{
             type: "text",
-            text: "❌ No data received",
+            text: "❌ No data received from stream",
           }],
           isError: true,
         };
       }
       
-      const txs = res.data?.transactions || [];
+      // CRITICAL FIX: Serialize BigInt values before JSON.stringify
+      const txs = this.serializeBigInt(res.data?.transactions || []);
+      
+      let output = `✅ Found ${txs.length} transactions\n\n`;
+      output += `**Network:** ${network}\n`;
+      output += `**Next block:** ${res.nextBlock}\n`;
+      
+      if (res.archiveHeight) {
+        output += `**Archive height:** ${res.archiveHeight}\n`;
+      }
+      
+      if (txs.length > 0) {
+        output += `\n**Sample (first 3):**\n\`\`\`json\n${JSON.stringify(txs.slice(0, 3), null, 2)}\n\`\`\``;
+      } else {
+        output += `\n**Note:** No transactions in this range.`;
+      }
       
       return {
         content: [{
           type: "text",
-          text: `✅ Found ${txs.length} transactions\n\n**Network:** ${network}\n**Next block:** ${res.nextBlock}\n\n**Sample (first 3):**\n\`\`\`json\n${JSON.stringify(txs.slice(0, 3), null, 2)}\n\`\`\``,
+          text: output,
         }],
       };
       
@@ -274,7 +305,7 @@ export class HyperSyncTools {
       return {
         content: [{
           type: "text",
-          text: `❌ Error: ${error.message}`,
+          text: `❌ Error: ${error.message}\n\n**Stack:** ${error.stack}`,
         }],
         isError: true,
       };
@@ -292,7 +323,6 @@ export class HyperSyncTools {
       query.toBlock = to_block || filters.to_block;
     }
     
-    // Build field selection
     query.fieldSelection = {};
     
     switch (query_type) {
@@ -301,9 +331,6 @@ export class HyperSyncTools {
           LogField.Address,
           LogField.Data,
           LogField.Topic0,
-          LogField.Topic1,
-          LogField.Topic2,
-          LogField.Topic3,
         ];
         
         if (filters?.addresses || filters?.topics) {
@@ -311,6 +338,8 @@ export class HyperSyncTools {
             ...(filters.addresses && { address: filters.addresses }),
             ...(filters.topics && { topics: Array.isArray(filters.topics[0]) ? filters.topics : [filters.topics] }),
           }];
+        } else {
+          query.logs = [{}];
         }
         break;
         
@@ -322,11 +351,13 @@ export class HyperSyncTools {
           TransactionField.Value,
         ];
         
-        const txFilters = [];
-        if (filters?.from) txFilters.push({ from: [filters.from] });
-        if (filters?.to) txFilters.push({ to: [filters.to] });
-        if (txFilters.length > 0) {
+        if (filters?.from || filters?.to) {
+          const txFilters = [];
+          if (filters.from) txFilters.push({ from: [filters.from] });
+          if (filters.to) txFilters.push({ to: [filters.to] });
           query.transactions = txFilters;
+        } else {
+          query.transactions = [{}];
         }
         break;
         
@@ -334,39 +365,27 @@ export class HyperSyncTools {
         query.fieldSelection.block = field_selection?.block || [
           BlockField.Number,
           BlockField.Timestamp,
-          BlockField.Hash,
         ];
         query.includeAllBlocks = true;
         break;
     }
     
-    const usageExample = `// HyperSync Query
-import { HypersyncClient } from "@envio-dev/hypersync-client";
+    const example = `import { HypersyncClient } from "@envio-dev/hypersync-client";
 
-const client = HypersyncClient.new({
-  url: "https://eth.hypersync.xyz"
-});
+const client = HypersyncClient.new({ url: "https://eth.hypersync.xyz" });
 
 const query = ${JSON.stringify(query, null, 2)};
 
-// Stream data
 const stream = await client.stream(query, {});
+const res = await stream.recv();
 
-while (true) {
-  const res = await stream.recv();
-  if (!res) break;
-  
-  console.log("Logs:", res.data?.logs?.length || 0);
-  console.log("Next block:", res.nextBlock);
-  
-  // Update for next iteration
-  query.fromBlock = res.nextBlock;
-}`;
+console.log("Data:", res.data);
+console.log("Next block:", res.nextBlock);`;
     
     return {
       content: [{
         type: "text",
-        text: `✅ Query built:\n\n\`\`\`json\n${JSON.stringify(query, null, 2)}\n\`\`\`\n\n**Usage:**\n\`\`\`typescript\n${usageExample}\n\`\`\`\n\n**Key Points:**\n- Automatic pagination with \`nextBlock\`\n- Efficient field selection reduces data transfer\n- \`includeAllBlocks\` for block queries\n- Topics format: \`[[topic0], [topic1], ...]\``,
+        text: `✅ Query built:\n\n\`\`\`json\n${JSON.stringify(query, null, 2)}\n\`\`\`\n\n**Important:**\n- Empty array \`[]\` = NO results\n- Empty object \`[{}]\` = ALL results\n- Filters = FILTERED results\n\n**Usage:**\n\`\`\`typescript\n${example}\n\`\`\``,
       }],
     };
   }
@@ -397,7 +416,7 @@ while (true) {
       return {
         content: [{
           type: "text",
-          text: `❌ Network "${network_name}" not found.\n\n**Supported networks:**\n${allNetworks}\n\n**More:** https://docs.envio.dev/docs/HyperSync/hypersync-supported-networks`,
+          text: `❌ Network "${network_name}" not found.\n\n**Supported:**\n${allNetworks}`,
         }],
         isError: true,
       };
@@ -406,7 +425,7 @@ while (true) {
     return {
       content: [{
         type: "text",
-        text: `✅ **${network.name}** (Chain ID: ${network.chainId})\n\n**URL:** ${network.url}\n\n**Usage:**\n\`\`\`typescript\nimport { HypersyncClient } from "@envio-dev/hypersync-client";\n\nconst client = HypersyncClient.new({\n  url: "${network.url}",\n});\n\`\`\`\n\n**Docs:** https://docs.envio.dev/docs/HyperSync/hypersync-supported-networks`,
+        text: `✅ **${network.name}** (Chain ID: ${network.chainId})\n\n**URL:** ${network.url}\n\n**Usage:**\n\`\`\`typescript\nimport { HypersyncClient } from "@envio-dev/hypersync-client";\n\nconst client = HypersyncClient.new({\n  url: "${network.url}"\n});\n\`\`\``,
       }],
     };
   }

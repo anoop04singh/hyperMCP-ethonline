@@ -111,7 +111,7 @@ The **Model Context Protocol (MCP)** allows AI assistants to securely connect wi
 
 ```bash
 git clone https://github.com/anoop04singh/hyperMCP-ethonline
-cd hypermcp
+cd hyperMCP-ethonline
 npm install
 npm run build
 ```

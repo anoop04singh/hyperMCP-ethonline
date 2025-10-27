@@ -9,6 +9,8 @@
 **HyperMCP** is a **Model Context Protocol (MCP)** server that integrates **Envio's blockchain indexing capabilities** directly into AI assistants such as **Claude Desktop**.
 It offers **35+ intelligent tools** for developers to build, query, and manage blockchain indexers using natural language.
 
+read the deatiled guide at: [HyperMCP: Building Blockchain Indexers Through Conversations](https://0xanoop.substack.com/p/hypermcp-building-blockchain-indexers)
+
 ---
 
 ## **What is Envio?**
@@ -32,67 +34,61 @@ The **Model Context Protocol (MCP)** allows AI assistants to securely connect wi
 
 ## **Features**
 
-### **HyperIndex Tools (15+ commands)**
+### HyperMCP provides specialized tools across four categories:
 
-#### Project Initialization
+### 1. HyperIndex Tools (Code Generation)
 
-* Initialize new indexer projects from scratch
-* Import contracts from block explorers (70+ networks)
-* Import contracts from local ABI files
-* Use pre-built templates (ERC20, Greeter, etc.)
+* Project structure generation
 
-#### Development Workflow
+* Config.yaml creation
 
-* Run development mode with hot reloading
-* Generate TypeScript/JavaScript types from config
-* Validate configuration files
-* Generate event handler templates
-* Create GraphQL schemas
+* Schema.graphql generation
 
-#### Environment Management
+* TypeScript handler templates
 
-* Start/stop local Docker containers
-* Manage database migrations
-* Benchmark performance
-* Configure multi-chain environments
+* Multi-chain setup
+
+* Dynamic contract patterns
+
+* Validation and optimization
 
 ---
 
-### **HyperSync Tools (5+ commands)**
+### 2. HyperSync Tools (Data Queries)
 
-#### Data Querying
+* Event log queries across 70+ networks
 
-* Query blockchain event logs with advanced filters
-* Query transactions by address, hash, or block range
-* Stream real-time blockchain events
-* Build custom queries with field selection
-* Access 70+ EVM-compatible networks
+* Transaction lookups
 
-#### Query Optimization
+* Real-time event streaming
 
-* Automatic pagination
-* Efficient field selection
-* Reverse search (latest-first)
-* Implicit data joins (logs → transactions → blocks)
+* Custom query building
+
+* Network endpoint discovery
 
 ---
 
-### **Documentation Tools (5+ commands)**
+### 3. Documentation Tools
 
-* Semantic search across HyperIndex, HyperSync, and HyperRPC docs
-* Retrieve configuration references and code examples
-* Context-aware error troubleshooting
-* Migration guides from other platforms
+* Semantic search across all Envio docs
+
+* Code example retrieval
+
+* Config reference lookup
+
+* Error troubleshooting
 
 ---
 
-### **Configuration Tools (5+ commands)**
+### 4. Configuration Tools
 
-* Create `config.yaml` templates
-* Add networks and contracts dynamically
-* Validate configuration syntax
-* Generate complete project structures
-* Multi-chain setup helpers
+* Template generation
+
+* Network addition
+
+* Contract management
+
+* Validation helpers
 
 ---
 

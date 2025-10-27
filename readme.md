@@ -1,7 +1,5 @@
 # **HyperMCP**
 
-### *AI-Powered Developer Assistant for Envio's Blockchain Indexing Stack*
-
 **Built by [@0xanoop](https://x.com/0xanoop)** for the **Envio AI + Tooling Hackathon**
 
 ---
@@ -112,7 +110,7 @@ The **Model Context Protocol (MCP)** allows AI assistants to securely connect wi
 ### **Installation**
 
 ```bash
-git clone https://github.com/0xanoop/hypermcp.git
+git clone https://github.com/anoop04singh/hyperMCP-ethonline
 cd hypermcp
 npm install
 npm run build
